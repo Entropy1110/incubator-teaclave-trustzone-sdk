@@ -19,6 +19,13 @@ use clap::Parser;
 use image::EncodableLayout;
 use optee_teec::Context;
 use proto::{Image, IMAGE_SIZE};
+use serde_json;
+
+#[derive(serde::Deserialize)]
+struct EncryptedModelFile {
+    algorithm: String,
+    encrypted_data: Vec<u8>,
+}
 
 #[derive(Parser, Debug)]
 pub struct Args {
@@ -36,7 +43,20 @@ pub struct Args {
 pub fn execute(args: &Args) -> anyhow::Result<()> {
     let model_path = std::path::absolute(&args.model)?;
     println!("Load model from \"{}\"", model_path.display());
-    let record = std::fs::read(&model_path)?;
+    
+    let record = if model_path.extension().and_then(|s| s.to_str()) == Some("json") {
+        println!("Detected encrypted model file");
+        let encrypted_data = std::fs::read(&model_path)?;
+        let encrypted_model: EncryptedModelFile = serde_json::from_slice(&encrypted_data)?;
+        println!("Model algorithm: {}", encrypted_model.algorithm);
+        encrypted_model.encrypted_data
+    } else {
+        println!("Loading plaintext model (legacy mode)");
+        std::fs::read(&model_path)?
+    };
+    
+    println!("Sending model to TA for secure processing...");
+    
     let mut ctx = Context::new()?;
     let mut caller = crate::tee::InferenceTaConnector::new(&mut ctx, &record)?;
 

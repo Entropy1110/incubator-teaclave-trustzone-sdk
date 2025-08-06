@@ -40,9 +40,9 @@ export CROSS_COMPILE32="arm-linux-gnueabihf-"
 export CROSS_COMPILE64="aarch64-linux-gnu-"
 
 # build optee_os and optee_client for qemu_v8
-git clone https://github.com/OP-TEE/optee_os.git -b $OPTEE_VERSION $OPTEE_DIR/optee_os
-(cd $OPTEE_DIR/optee_os && make PLATFORM=vexpress-qemu_armv8a)
+git clone https://github.com/STMicroelectronics/optee_os $OPTEE_DIR/optee_os
+(cd $OPTEE_DIR/optee_os && make PLATFORM=stm32mp2 PLATFORM_FLAVOR=257F_DK  -j8)
 
-git clone https://github.com/OP-TEE/optee_client.git -b $OPTEE_VERSION $OPTEE_DIR/optee_client
+git clone https://github.com/OP-TEE/optee_client.git $OPTEE_DIR/optee_client
 (cd $OPTEE_DIR/optee_client && make WITH_TEEACL=0 DESTDIR=$PWD/export_arm32 CROSS_COMPILE=$CROSS_COMPILE32)
 (cd $OPTEE_DIR/optee_client && make clean && make WITH_TEEACL=0 DESTDIR=$PWD/export_arm64 CROSS_COMPILE=$CROSS_COMPILE64)

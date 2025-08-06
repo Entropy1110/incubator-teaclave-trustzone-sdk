@@ -21,7 +21,7 @@ use burn::{
     record::{FullPrecisionSettings, Recorder, RecorderError},
 };
 use proto::{Image, IMAGE_SIZE, NUM_CLASSES};
-
+use optee_utee::{trace_println};
 /// This is a simple model designed solely to demonstrate how to train and
 /// perform inference, don't use it in production.
 #[derive(Module, Debug)]
@@ -38,11 +38,6 @@ impl<B: Backend> Model<B> {
 
     pub fn forward(&self, input: Tensor<B, 2>) -> Tensor<B, 2> {
         self.linear.forward(input)
-    }
-
-    pub fn export(&self) -> Result<Vec<u8>, RecorderError> {
-        let recorder = burn::record::BinBytesRecorder::<FullPrecisionSettings>::new();
-        recorder.record(self.clone().into_record(), ())
     }
 
     pub fn import(device: &B::Device, record: Vec<u8>) -> Result<Self, RecorderError> {

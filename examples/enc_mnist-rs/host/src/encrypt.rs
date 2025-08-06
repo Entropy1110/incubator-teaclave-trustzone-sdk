@@ -14,20 +14,5 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-#[derive(Debug, TryFromPrimitive, IntoPrimitive)]
-#[repr(u32)]
-pub enum Command {
-    Train,
-    Valid,
-    Export,
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct Output {
-    pub loss: f32,
-    pub accuracy: f32,
-}
-
-pub const UUID: &str = &include_str!("../../ta/train/uuid.txt");
+// Legacy encryption utilities - now simplified since all encryption happens in TA

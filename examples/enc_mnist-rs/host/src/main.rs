@@ -15,12 +15,32 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#![no_std]
-pub mod inference;
-pub mod train;
+mod commands;
+mod tee;
+mod encrypt;
 
-pub const IMAGE_HEIGHT: usize = 28;
-pub const IMAGE_WIDTH: usize = 28;
-pub const IMAGE_SIZE: usize = IMAGE_HEIGHT * IMAGE_WIDTH;
-pub const NUM_CLASSES: usize = 10;
-pub type Image = [u8; IMAGE_SIZE];
+use clap::{Parser, Subcommand};
+
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    Infer(commands::infer::Args),
+    Serve(commands::serve::Args),
+    EncryptModel(commands::encrypt::Args),
+}
+
+fn main() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+
+    match cli.command {
+        Commands::Infer(args) => commands::infer::execute(&args),
+        Commands::Serve(args) => commands::serve::execute(&args),
+        Commands::EncryptModel(args) => commands::encrypt::execute(&args),
+    }
+}

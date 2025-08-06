@@ -15,31 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-mod commands;
-mod tee;
+use optee_utee_build::{Error, RustEdition, TaConfig};
 
-use clap::{Parser, Subcommand};
-
-#[derive(Parser)]
-#[command(version, about, long_about = None)]
-struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-}
-
-#[derive(Subcommand)]
-enum Commands {
-    Train(commands::train::Args),
-    Infer(commands::infer::Args),
-    Serve(commands::serve::Args),
-}
-
-fn main() -> anyhow::Result<()> {
-    let cli = Cli::parse();
-
-    match cli.command {
-        Commands::Train(args) => commands::train::execute(&args),
-        Commands::Infer(args) => commands::infer::execute(&args),
-        Commands::Serve(args) => commands::serve::execute(&args),
-    }
+fn main() -> Result<(), Error> {
+    let config = TaConfig::new_default_with_cargo_env(proto::inference::UUID)?
+        .ta_data_size(1 * 1024 * 1024)
+        .ta_stack_size(1 * 1024 * 1024)
+        .ta_framework_stack_size(8192);
+    optee_utee_build::build(RustEdition::Before2024, config)
 }

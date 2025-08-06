@@ -20,7 +20,6 @@ resolver = "2"
 
 members = [
     "common",
-    "train",
     "inference",
 ]
 

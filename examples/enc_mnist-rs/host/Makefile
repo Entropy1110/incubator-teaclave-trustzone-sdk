@@ -15,32 +15,23 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# If _HOST or _TA specific compiler/target are not specified, then use common
-# compiler/target for both
-CROSS_COMPILE_HOST ?= aarch64-linux-gnu-
-CROSS_COMPILE_TA ?= aarch64-linux-gnu-
-TARGET_HOST ?= aarch64-unknown-linux-gnu
-TARGET_TA ?= aarch64-unknown-linux-gnu
+NAME := enc_mnist-rs
 
-.PHONY: host ta all clean
+TARGET ?= aarch64-unknown-linux-gnu
+CROSS_COMPILE ?= aarch64-linux-gnu-
+OBJCOPY := $(CROSS_COMPILE)objcopy
+LINKER_CFG := target.$(TARGET).linker=\"$(CROSS_COMPILE)gcc\"
 
-all: toolchain host ta
+OUT_DIR := $(CURDIR)/target/$(TARGET)/release
 
-toolchain:
-	rustup toolchain install
 
-host: toolchain
-	$(q)make -C host TARGET=$(TARGET_HOST) \
-		CROSS_COMPILE=$(CROSS_COMPILE_HOST)
+all: host strip
 
-ta: toolchain
-	$(q)make -C ta/train TARGET=$(TARGET_TA) \
-		CROSS_COMPILE=$(CROSS_COMPILE_TA)
-	$(q)make -C ta/inference TARGET=$(TARGET_TA) \
-		CROSS_COMPILE=$(CROSS_COMPILE_TA)
+host:
+	@cargo build --target $(TARGET_HOST) --release --config $(LINKER_CFG)
+
+strip: host
+	@$(OBJCOPY) --strip-unneeded $(OUT_DIR)/$(NAME) $(OUT_DIR)/$(NAME)
 
 clean:
-	$(q)make -C host clean
-	cd proto && cargo clean
-	$(q)make -C ta/train clean
-	$(q)make -C ta/inference clean
+	@cargo clean
