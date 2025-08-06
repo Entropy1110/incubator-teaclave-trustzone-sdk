@@ -25,6 +25,10 @@ description = "An example of Rust OP-TEE TrustZone SDK."
 edition = "2021"
 publish = false
 
+[features]
+default = ["encrypt-model"]
+encrypt-model = []
+
 [dependencies]
 proto = { path = "../proto" }
 optee-teec = { path = "../../../optee-teec" }

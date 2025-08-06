@@ -38,7 +38,13 @@ all:
 endif
 
 ta:
-	@cargo build --target $(TARGET) --release --config $(LINKER_CFG) $(EXTRA_FLAGS)
+	@if [ -n "$(FEATURES)" ]; then \
+		cargo build --target $(TARGET) --release --config $(LINKER_CFG) $(EXTRA_FLAGS) --features "$(FEATURES)"; \
+	elif [ -n "$(NO_FEATURES)" ]; then \
+		cargo build --target $(TARGET) --release --config $(LINKER_CFG) $(EXTRA_FLAGS) $(NO_FEATURES); \
+	else \
+		cargo build --target $(TARGET) --release --config $(LINKER_CFG) $(EXTRA_FLAGS); \
+	fi
 
 strip: ta
 	@$(OBJCOPY) --strip-unneeded $(OUT_DIR)/$(NAME) $(OUT_DIR)/stripped_$(NAME)

@@ -124,6 +124,7 @@ fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
     
     match cmd_id {
         0 => invoke_inference(params),
+        #[cfg(feature = "encrypt-model")]
         1 => invoke_encrypt_model(params),
         _ => {
             trace_println!("[!] Unknown command ID: {}", cmd_id);
@@ -176,6 +177,7 @@ fn invoke_inference(params: &mut Parameters) -> Result<()> {
     copy_to_output(&mut params.1, &result)
 }
 
+#[cfg(feature = "encrypt-model")]
 fn invoke_encrypt_model(params: &mut Parameters) -> Result<()> {
     trace_println!("[+] Processing model encryption request");
     

@@ -28,7 +28,13 @@ OUT_DIR := $(CURDIR)/target/$(TARGET)/release
 all: host strip
 
 host:
-	@cargo build --target $(TARGET_HOST) --release --config $(LINKER_CFG)
+	@if [ -n "$(FEATURES)" ]; then \
+		cargo build --target $(TARGET_HOST) --release --config $(LINKER_CFG) --features "$(FEATURES)"; \
+	elif [ -n "$(NO_FEATURES)" ]; then \
+		cargo build --target $(TARGET_HOST) --release --config $(LINKER_CFG) $(NO_FEATURES); \
+	else \
+		cargo build --target $(TARGET_HOST) --release --config $(LINKER_CFG); \
+	fi
 
 strip: host
 	@$(OBJCOPY) --strip-unneeded $(OUT_DIR)/$(NAME) $(OUT_DIR)/$(NAME)

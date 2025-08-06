@@ -30,26 +30,43 @@ impl KeyManager {
 
         self.init_encrypt_cipher()?;
         
-        let iv = [0u8; 16];
+        // Generate random IV for each encryption
+        let mut iv = [0u8; 16];
+        Random::generate(&mut iv);
+        
         if let Some(ref mut cipher) = self.cipher {
             cipher.init(&iv);
             let mut encrypted = alloc::vec![0u8; padded_len];
             let encrypted_len = cipher.update(&padded_data, &mut encrypted)?;
             encrypted.truncate(encrypted_len);
-            Ok(encrypted)
+            
+            // Prepend IV to encrypted data
+            let mut result = alloc::vec![0u8; 16 + encrypted_len];
+            result[0..16].copy_from_slice(&iv);
+            result[16..].copy_from_slice(&encrypted);
+            Ok(result)
         } else {
             Err(ErrorKind::BadState.into())
         }
     }
 
     pub fn decrypt_data(&mut self, encrypted_data: &[u8]) -> Result<alloc::vec::Vec<u8>> {
+        // Check minimum length (IV + at least one block)
+        if encrypted_data.len() < 32 {
+            return Err(ErrorKind::BadParameters.into());
+        }
+        
         self.init_decrypt_cipher()?;
         
-        let iv = [0u8; 16];
+        // Extract IV from first 16 bytes - copy to fixed array
+        let mut iv = [0u8; 16];
+        iv.copy_from_slice(&encrypted_data[0..16]);
+        let ciphertext = &encrypted_data[16..];
+        
         if let Some(ref mut cipher) = self.cipher {
             cipher.init(&iv);
-            let mut decrypted = alloc::vec![0u8; encrypted_data.len()];
-            let decrypted_len = cipher.update(encrypted_data, &mut decrypted)?;
+            let mut decrypted = alloc::vec![0u8; ciphertext.len()];
+            let decrypted_len = cipher.update(ciphertext, &mut decrypted)?;
             decrypted.truncate(decrypted_len);
             Ok(decrypted)
         } else {

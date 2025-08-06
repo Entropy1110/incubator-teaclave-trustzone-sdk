@@ -32,6 +32,7 @@ struct Cli {
 enum Commands {
     Infer(commands::infer::Args),
     Serve(commands::serve::Args),
+    #[cfg(feature = "encrypt-model")]
     EncryptModel(commands::encrypt::Args),
 }
 
@@ -41,6 +42,7 @@ fn main() -> anyhow::Result<()> {
     match cli.command {
         Commands::Infer(args) => commands::infer::execute(&args),
         Commands::Serve(args) => commands::serve::execute(&args),
+        #[cfg(feature = "encrypt-model")]
         Commands::EncryptModel(args) => commands::encrypt::execute(&args),
     }
 }

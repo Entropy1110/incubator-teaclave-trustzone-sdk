@@ -22,7 +22,16 @@ CROSS_COMPILE_TA ?= aarch64-linux-gnu-
 TARGET_HOST ?= aarch64-unknown-linux-gnu
 TARGET_TA ?= aarch64-unknown-linux-gnu
 
-.PHONY: host ta all clean
+# Feature flags for conditional compilation
+FEATURES ?= encrypt-model
+NO_FEATURES ?=
+
+.PHONY: host ta all clean no-encrypt
+
+# Build targets with feature flags
+no-encrypt: FEATURES=
+no-encrypt: NO_FEATURES=--no-default-features
+no-encrypt: all
 
 all: toolchain host ta
 
@@ -31,11 +40,13 @@ toolchain:
 
 host: toolchain
 	$(q)make -C host TARGET=$(TARGET_HOST) \
-		CROSS_COMPILE=$(CROSS_COMPILE_HOST)
+		CROSS_COMPILE=$(CROSS_COMPILE_HOST) \
+		FEATURES="$(FEATURES)" NO_FEATURES="$(NO_FEATURES)"
 
 ta: toolchain
 	$(q)make -C ta/inference TARGET=$(TARGET_TA) \
-		CROSS_COMPILE=$(CROSS_COMPILE_TA)
+		CROSS_COMPILE=$(CROSS_COMPILE_TA) \
+		FEATURES="$(FEATURES)" NO_FEATURES="$(NO_FEATURES)"
 
 clean:
 	$(q)make -C host clean
