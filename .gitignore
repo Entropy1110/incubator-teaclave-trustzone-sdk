@@ -22,6 +22,9 @@ target/
 /out
 Cargo.lock
 examples/enc_mnist-rs/CLAUDE.md
+
+rust/
+
 # Allow tracking Cargo.lock in std examples
 !examples/message_passing_interface-rs/ta/Cargo.lock
 !examples/secure_db_abstraction-rs/ta/Cargo.lock

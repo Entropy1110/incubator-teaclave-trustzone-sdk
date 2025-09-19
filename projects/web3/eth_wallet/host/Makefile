@@ -23,13 +23,7 @@ OBJCOPY := $(CROSS_COMPILE)objcopy
 LINKER_CFG := target.$(TARGET).linker=\"$(CROSS_COMPILE)gcc\"
 
 OUT_DIR := $(CURDIR)/target/$(TARGET)/release
-
-ifeq ($(STD),)
-all:
-	@echo "Please \`export STD=y\` then rerun \`source environment\` to build the STD version"
-else
 all: host strip
-endif
 
 host:
 	@cargo build --target $(TARGET_HOST) --release --config $(LINKER_CFG)

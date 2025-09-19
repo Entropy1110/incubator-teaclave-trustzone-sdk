@@ -20,14 +20,14 @@
 
 extern crate alloc;
 
-use alloc::vec;
 use alloc::boxed::Box;
+use alloc::vec;
 use optee_utee::{
     ta_close_session, ta_create, ta_destroy, ta_invoke_command, ta_open_session, trace_println,
 };
 use optee_utee::{AlgorithmId, OperationMode, AE};
-use optee_utee::{AttributeId, AttributeMemref, GenericObject, TransientObject, TransientObjectType};
-use optee_utee::{Error, ErrorKind, Parameters, Result};
+use optee_utee::{AttributeId, AttributeMemref, TransientObject, TransientObjectType};
+use optee_utee::{ErrorKind, Parameters, Result};
 use proto::{Command, Mode, AAD_LEN, BUFFER_SIZE, KEY_SIZE, TAG_LEN};
 
 pub const PAYLOAD_NUMBER: usize = 2;
@@ -38,9 +38,7 @@ pub struct AEOp {
 
 impl Default for AEOp {
     fn default() -> Self {
-        Self {
-            op: AE::null()
-        }
+        Self { op: AE::null() }
     }
 }
 
@@ -72,31 +70,29 @@ fn invoke_command(sess_ctx: &mut AEOp, cmd_id: u32, params: &mut Parameters) -> 
     match Command::from(cmd_id) {
         Command::Prepare => {
             trace_println!("[+] TA prepare");
-            return prepare(sess_ctx, params);
+            prepare(sess_ctx, params)
         }
         Command::Update => {
             trace_println!("[+] TA update");
-            return update(sess_ctx, params);
+            update(sess_ctx, params)
         }
         Command::EncFinal => {
             trace_println!("[+] TA encrypt_final");
-            return encrypt_final(sess_ctx, params);
+            encrypt_final(sess_ctx, params)
         }
         Command::DecFinal => {
             trace_println!("[+] TA decrypt_final");
-            return decrypt_final(sess_ctx, params);
+            decrypt_final(sess_ctx, params)
         }
-        _ => {
-            return Err(Error::new(ErrorKind::BadParameters));
-        }
+        _ => Err(ErrorKind::BadParameters.into()),
     }
 }
 
 pub fn prepare(ae: &mut AEOp, params: &mut Parameters) -> Result<()> {
-    let p0 = unsafe { params.0.as_value().unwrap() };
-    let mut p1 = unsafe { params.1.as_memref().unwrap() };
-    let mut p2 = unsafe { params.2.as_memref().unwrap() };
-    let mut p3 = unsafe { params.3.as_memref().unwrap() };
+    let p0 = unsafe { params.0.as_value()? };
+    let mut p1 = unsafe { params.1.as_memref()? };
+    let mut p2 = unsafe { params.2.as_memref()? };
+    let mut p3 = unsafe { params.3.as_memref()? };
     let mode = match Mode::from(p0.a()) {
         Mode::Encrypt => OperationMode::Encrypt,
         Mode::Decrypt => OperationMode::Decrypt,
@@ -106,21 +102,21 @@ pub fn prepare(ae: &mut AEOp, params: &mut Parameters) -> Result<()> {
     let key = p2.buffer();
     let aad = p3.buffer();
 
-    ae.op = AE::allocate(AlgorithmId::AesCcm, mode, KEY_SIZE * 8).unwrap();
+    ae.op = AE::allocate(AlgorithmId::AesCcm, mode, KEY_SIZE * 8)?;
 
-    let mut key_object = TransientObject::allocate(TransientObjectType::Aes, KEY_SIZE * 8).unwrap();
+    let mut key_object = TransientObject::allocate(TransientObjectType::Aes, KEY_SIZE * 8)?;
     let attr = AttributeMemref::from_ref(AttributeId::SecretValue, key);
     key_object.populate(&[attr.into()])?;
     ae.op.set_key(&key_object)?;
     ae.op
-        .init(&nonce, TAG_LEN * 8, AAD_LEN, BUFFER_SIZE * PAYLOAD_NUMBER)?;
+        .init(nonce, TAG_LEN * 8, AAD_LEN, BUFFER_SIZE * PAYLOAD_NUMBER)?;
     ae.op.update_aad(aad);
     Ok(())
 }
 
 pub fn update(digest: &mut AEOp, params: &mut Parameters) -> Result<()> {
-    let mut p0 = unsafe { params.0.as_memref().unwrap() };
-    let mut p1 = unsafe { params.1.as_memref().unwrap() };
+    let mut p0 = unsafe { params.0.as_memref()? };
+    let mut p1 = unsafe { params.1.as_memref()? };
     let src = p0.buffer();
     let res = p1.buffer();
     digest.op.update(src, res)?;
@@ -128,40 +124,39 @@ pub fn update(digest: &mut AEOp, params: &mut Parameters) -> Result<()> {
 }
 
 pub fn encrypt_final(digest: &mut AEOp, params: &mut Parameters) -> Result<()> {
-    let mut p0 = unsafe { params.0.as_memref().unwrap() };
-    let mut p1 = unsafe { params.1.as_memref().unwrap() };
-    let mut p2 = unsafe { params.2.as_memref().unwrap() };
-    
-    let mut clear = vec![0; p0.buffer().len() as usize];
+    let mut p0 = unsafe { params.0.as_memref()? };
+    let mut p1 = unsafe { params.1.as_memref()? };
+    let mut p2 = unsafe { params.2.as_memref()? };
+
+    let mut clear = vec![0; p0.buffer().len()];
     clear.copy_from_slice(p0.buffer());
-    let mut ciph = vec![0; p1.buffer().len() as usize];
+    let mut ciph = vec![0; p1.buffer().len()];
     ciph.copy_from_slice(p1.buffer());
-    let mut tag = vec![0; p2.buffer().len() as usize];
+    let mut tag = vec![0; p2.buffer().len()];
     tag.copy_from_slice(p2.buffer());
 
     match digest.op.encrypt_final(&clear, &mut ciph, &mut tag) {
-
         Err(e) => Err(e),
         Ok((_ciph_len, _tag_len)) => {
             p0.buffer().copy_from_slice(&clear);
             p1.buffer().copy_from_slice(&ciph);
             p2.buffer().copy_from_slice(&tag);
-            
+
             Ok(())
-        },
+        }
     }
 }
 
 pub fn decrypt_final(digest: &mut AEOp, params: &mut Parameters) -> Result<()> {
-    let mut p0 = unsafe { params.0.as_memref().unwrap() };
-    let mut p1 = unsafe { params.1.as_memref().unwrap() };
-    let mut p2 = unsafe { params.2.as_memref().unwrap() };
-     
-    let mut clear = vec![0; p0.buffer().len() as usize];
+    let mut p0 = unsafe { params.0.as_memref()? };
+    let mut p1 = unsafe { params.1.as_memref()? };
+    let mut p2 = unsafe { params.2.as_memref()? };
+
+    let mut clear = vec![0; p0.buffer().len()];
     clear.copy_from_slice(p0.buffer());
-    let mut ciph = vec![0; p1.buffer().len() as usize];
+    let mut ciph = vec![0; p1.buffer().len()];
     ciph.copy_from_slice(p1.buffer());
-    let mut tag = vec![0; p2.buffer().len() as usize];
+    let mut tag = vec![0; p2.buffer().len()];
     tag.copy_from_slice(p2.buffer());
 
     match digest.op.decrypt_final(&clear, &mut ciph, &tag) {
@@ -171,8 +166,8 @@ pub fn decrypt_final(digest: &mut AEOp, params: &mut Parameters) -> Result<()> {
             p1.buffer().copy_from_slice(&ciph);
             p2.buffer().copy_from_slice(&tag);
 
-            Ok(())    
-        },
+            Ok(())
+        }
     }
 }
 

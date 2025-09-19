@@ -16,8 +16,7 @@
 // under the License.
 
 use optee_teec::{
-    Context, Error, ErrorKind, Operation, ParamNone, ParamTmpRef, ParamType, ParamValue, Session,
-    Uuid,
+    Context, ErrorKind, Operation, ParamNone, ParamTmpRef, ParamType, ParamValue, Session, Uuid,
 };
 use proto::{Command, UUID};
 
@@ -44,19 +43,16 @@ fn get_hotp(session: &mut Session) -> optee_teec::Result<()> {
     let p0 = ParamValue::new(0, 0, ParamType::ValueOutput);
     let mut operation = Operation::new(0, p0, ParamNone, ParamNone, ParamNone);
 
-    for i in 0..TEST_SIZE {
+    for &expected_value in &RFC4226_TEST_VALUES {
         session.invoke_command(Command::GetHOTP as u32, &mut operation)?;
         let (p0, _, _, _) = operation.parameters();
         let hotp_value = p0.a();
 
         println!("Get HOTP: {}", hotp_value);
 
-        if hotp_value != RFC4226_TEST_VALUES[i] {
-            println!(
-                "Wrong value get! Expected value: {}",
-                RFC4226_TEST_VALUES[i]
-            );
-            return Err(Error::new(ErrorKind::Generic));
+        if hotp_value != expected_value {
+            println!("Wrong value get! Expected value: {}", expected_value);
+            return Err(ErrorKind::Generic.into());
         }
     }
     Ok(())
@@ -64,7 +60,7 @@ fn get_hotp(session: &mut Session) -> optee_teec::Result<()> {
 
 fn main() -> optee_teec::Result<()> {
     let mut ctx = Context::new()?;
-    let uuid = Uuid::parse_str(UUID).unwrap();
+    let uuid = Uuid::parse_str(UUID)?;
     let mut session = ctx.open_session(uuid)?;
 
     register_shared_key(&mut session)?;

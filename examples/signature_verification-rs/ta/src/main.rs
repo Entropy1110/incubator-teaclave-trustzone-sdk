@@ -24,8 +24,8 @@ use alloc::vec;
 use optee_utee::{
     ta_close_session, ta_create, ta_destroy, ta_invoke_command, ta_open_session, trace_println,
 };
-use optee_utee::{AlgorithmId, AttributeId, AttributeMemref, Digest, Asymmetric, OperationMode};
-use optee_utee::{Error, ErrorKind, Parameters, Result};
+use optee_utee::{AlgorithmId, Asymmetric, AttributeId, AttributeMemref, Digest, OperationMode};
+use optee_utee::{ErrorKind, Parameters, Result};
 use optee_utee::{GenericObject, TransientObject, TransientObjectType};
 use proto::Command;
 
@@ -64,59 +64,70 @@ fn destroy() {
 }
 
 fn sign(params: &mut Parameters) -> Result<()> {
-    let mut p0 = unsafe { params.0.as_memref().unwrap() };
-    let mut p1 = unsafe { params.1.as_memref().unwrap() };
-    let mut p2 = unsafe { params.2.as_memref().unwrap() };
+    let mut p0 = unsafe { params.0.as_memref()? };
+    let mut p1 = unsafe { params.1.as_memref()? };
+    let mut p2 = unsafe { params.2.as_memref()? };
     let message = p0.buffer();
     let mut pub_key_size: usize = 0;
     trace_println!("[+] message: {:?}", &message);
 
-    let rsa_key =
-        TransientObject::allocate(TransientObjectType::RsaKeypair, 2048 as usize).unwrap();
+    let rsa_key = TransientObject::allocate(TransientObjectType::RsaKeypair, 2048_usize)?;
 
-    rsa_key.generate_key(2048 as usize, &[])?;
+    rsa_key.generate_key(2048_usize, &[])?;
 
-    match rsa_key.ref_attribute(AttributeId::RsaModulus, &mut p1.buffer()) {
-        Ok(len) => Ok(pub_key_size += len),
+    match rsa_key.ref_attribute(AttributeId::RsaModulus, p1.buffer()) {
+        Ok(len) => {
+            pub_key_size += len;
+            Ok(())
+        }
         Err(e) => Err(e),
     }?;
 
-    match rsa_key.ref_attribute(AttributeId::RsaPublicExponent, &mut p1.buffer()[pub_key_size..]) {
-        Ok(len) => Ok(pub_key_size += len),
+    match rsa_key.ref_attribute(
+        AttributeId::RsaPublicExponent,
+        &mut p1.buffer()[pub_key_size..],
+    ) {
+        Ok(len) => {
+            pub_key_size += len;
+            Ok(())
+        }
         Err(e) => Err(e),
     }?;
 
     p1.set_updated_size(pub_key_size);
 
     let mut hash = [0u8; 32];
-    let dig = Digest::allocate(AlgorithmId::Sha256).unwrap();
+    let dig = Digest::allocate(AlgorithmId::Sha256)?;
 
-    dig.do_final(&message, &mut hash)?;
+    dig.do_final(message, &mut hash)?;
 
-    let key_info = rsa_key.info().unwrap();
-    let mut signature = p2.buffer();
+    let key_info = rsa_key.info()?;
+    let signature = p2.buffer();
 
-    let rsa = Asymmetric::allocate(AlgorithmId::RsassaPkcs1V15Sha256,
-                                   OperationMode::Sign,
-                                   key_info.object_size()).unwrap();
+    let rsa = Asymmetric::allocate(
+        AlgorithmId::RsassaPkcs1V15Sha256,
+        OperationMode::Sign,
+        key_info.object_size(),
+    )?;
 
     rsa.set_key(&rsa_key)?;
-    match rsa.sign_digest(&[], &hash, &mut signature) {
+    match rsa.sign_digest(&[], &hash, signature) {
         Ok(len) => {
             trace_println!("[+] signature: {:?}", p2.buffer());
-            return Ok(p2.set_updated_size(len as usize));
+            p2.set_updated_size(len);
+            Ok(())
         }
         Err(e) => {
             trace_println!("[+] error: {:?}", e);
-            return Err(Error::new(ErrorKind::SignatureInvalid));
+            Err(ErrorKind::SignatureInvalid.into())
         }
-    };
+    }
 }
 
 fn verify(params: &mut Parameters) -> Result<()> {
-    let mut p0 = unsafe { params.0.as_memref().unwrap() };
-    let mut p1 = unsafe { params.1.as_memref().unwrap() };
-    let mut p2 = unsafe { params.2.as_memref().unwrap() };
+    let mut p0 = unsafe { params.0.as_memref()? };
+    let mut p1 = unsafe { params.1.as_memref()? };
+    let mut p2 = unsafe { params.2.as_memref()? };
 
     let message = p0.buffer();
     let mut pub_key_mod = vec![0u8; 256];
@@ -131,8 +142,7 @@ fn verify(params: &mut Parameters) -> Result<()> {
     trace_println!("[+] public_key_exp: {:?}", &pub_key_exp);
     trace_println!("[+] signature: {:?}", &signature);
 
-    let mut rsa_pub_key =
-        TransientObject::allocate(TransientObjectType::RsaPublicKey, 2048 as usize).unwrap();
+    let mut rsa_pub_key = TransientObject::allocate(TransientObjectType::RsaPublicKey, 2048_usize)?;
 
     let mod_attr = AttributeMemref::from_ref(AttributeId::RsaModulus, &pub_key_mod);
     let exp_attr = AttributeMemref::from_ref(AttributeId::RsaPublicExponent, &pub_key_exp);
@@ -140,40 +150,38 @@ fn verify(params: &mut Parameters) -> Result<()> {
     rsa_pub_key.populate(&[mod_attr.into(), exp_attr.into()])?;
 
     let mut hash = [0u8; 32];
-    let dig = Digest::allocate(AlgorithmId::Sha256).unwrap();
+    let dig = Digest::allocate(AlgorithmId::Sha256)?;
 
-    dig.do_final(&message, &mut hash)?;
+    dig.do_final(message, &mut hash)?;
 
-    let key_info = rsa_pub_key.info().unwrap();
+    let key_info = rsa_pub_key.info()?;
 
-    let rsa = Asymmetric::allocate(AlgorithmId::RsassaPkcs1V15Sha256,
-                                   OperationMode::Verify,
-                                   key_info.object_size()).unwrap();
+    let rsa = Asymmetric::allocate(
+        AlgorithmId::RsassaPkcs1V15Sha256,
+        OperationMode::Verify,
+        key_info.object_size(),
+    )?;
 
     rsa.set_key(&rsa_pub_key)?;
-    match rsa.verify_digest(&[], &hash, &signature) {
+    match rsa.verify_digest(&[], &hash, signature) {
         Ok(_) => {
             trace_println!("[+] verify ok");
-            return Ok(());
+            Ok(())
         }
         Err(e) => {
             trace_println!("[+] error: {:?}", e);
-            return Err(Error::new(ErrorKind::SignatureInvalid));
+            Err(ErrorKind::SignatureInvalid.into())
         }
-    };
+    }
 }
 
 #[ta_invoke_command]
 fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
     trace_println!("[+] TA invoke command");
     match Command::from(cmd_id) {
-        Command::Sign => {
-            return sign(params);
-        }
-        Command::Verify => {
-            return verify(params);
-        }
-        _ => Err(Error::new(ErrorKind::BadParameters)),
+        Command::Sign => sign(params),
+        Command::Verify => verify(params),
+        _ => Err(ErrorKind::BadParameters.into()),
     }
 }
 

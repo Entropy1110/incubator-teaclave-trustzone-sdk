@@ -25,7 +25,7 @@ use optee_utee::{
     ta_close_session, ta_create, ta_destroy, ta_invoke_command, ta_open_session, trace_println,
 };
 use optee_utee::{DataFlag, GenericObject, ObjectStorageConstants, PersistentObject};
-use optee_utee::{Error, ErrorKind, Parameters, Result};
+use optee_utee::{ErrorKind, Parameters, Result};
 use proto::Command;
 
 #[ta_create]
@@ -54,50 +54,40 @@ fn destroy() {
 fn invoke_command(cmd_id: u32, params: &mut Parameters) -> Result<()> {
     trace_println!("[+] TA invoke command");
     match Command::from(cmd_id) {
-        Command::Write => {
-            return create_raw_object(params);
-        }
-        Command::Read => {
-            return read_raw_object(params);
-        }
-        Command::Delete => {
-            return delete_object(params);
-        }
-        _ => {
-            return Err(Error::new(ErrorKind::NotSupported));
-        }
+        Command::Write => create_raw_object(params),
+        Command::Read => read_raw_object(params),
+        Command::Delete => delete_object(params),
+        _ => Err(ErrorKind::NotSupported.into()),
     }
 }
 
 pub fn delete_object(params: &mut Parameters) -> Result<()> {
-    let mut p0 = unsafe { params.0.as_memref().unwrap() };
+    let mut p0 = unsafe { params.0.as_memref()? };
 
-    let mut obj_id = vec![0; p0.buffer().len() as usize];
+    let mut obj_id = vec![0; p0.buffer().len()];
     obj_id.copy_from_slice(p0.buffer());
 
     match PersistentObject::open(
         ObjectStorageConstants::Private,
-        &mut obj_id,
+        &obj_id,
         DataFlag::ACCESS_READ | DataFlag::ACCESS_WRITE_META,
     ) {
-        Err(e) => {
-            return Err(e);
-        }
+        Err(e) => Err(e),
 
         Ok(object) => {
             object.close_and_delete()?;
-            return Ok(());
+            Ok(())
         }
     }
 }
 
 pub fn create_raw_object(params: &mut Parameters) -> Result<()> {
-    let mut p0 = unsafe { params.0.as_memref().unwrap() };
-    let mut p1 = unsafe { params.1.as_memref().unwrap() };
+    let mut p0 = unsafe { params.0.as_memref()? };
+    let mut p1 = unsafe { params.1.as_memref()? };
 
-    let mut obj_id = vec![0; p0.buffer().len() as usize];
+    let mut obj_id = vec![0; p0.buffer().len()];
     obj_id.copy_from_slice(p0.buffer());
-    let mut data_buffer = vec![0; p1.buffer().len() as usize];
+    let mut data_buffer = vec![0; p1.buffer().len()];
     data_buffer.copy_from_slice(p1.buffer());
 
     let obj_data_flag = DataFlag::ACCESS_READ
@@ -105,57 +95,53 @@ pub fn create_raw_object(params: &mut Parameters) -> Result<()> {
         | DataFlag::ACCESS_WRITE_META
         | DataFlag::OVERWRITE;
 
-    let mut init_data: [u8; 0] = [0; 0];
+    let init_data: [u8; 0] = [0; 0];
 
     match PersistentObject::create(
         ObjectStorageConstants::Private,
-        &mut obj_id,
+        &obj_id,
         obj_data_flag,
         None,
-        &mut init_data,
+        &init_data,
     ) {
-        Err(e) => {
-            return Err(e);
-        }
+        Err(e) => Err(e),
 
         Ok(mut object) => match object.write(&data_buffer) {
-            Ok(()) => {
-                return Ok(());
-            }
+            Ok(()) => Ok(()),
             Err(e_write) => {
                 object.close_and_delete()?;
-                return Err(e_write);
+                Err(e_write)
             }
         },
     }
 }
 
 pub fn read_raw_object(params: &mut Parameters) -> Result<()> {
-    let mut p0 = unsafe { params.0.as_memref().unwrap() };
-    let mut p1 = unsafe { params.1.as_memref().unwrap() };
-    let mut obj_id = vec![0; p0.buffer().len() as usize];
+    let mut p0 = unsafe { params.0.as_memref()? };
+    let mut p1 = unsafe { params.1.as_memref()? };
+    let mut obj_id = vec![0; p0.buffer().len()];
     obj_id.copy_from_slice(p0.buffer());
 
-    let mut data_buffer = vec![0;p1.buffer().len() as usize];
+    let mut data_buffer = vec![0; p1.buffer().len()];
     data_buffer.copy_from_slice(p1.buffer());
 
     match PersistentObject::open(
         ObjectStorageConstants::Private,
-        &mut obj_id,
+        &obj_id,
         DataFlag::ACCESS_READ | DataFlag::SHARE_READ,
     ) {
-        Err(e) => return Err(e),
+        Err(e) => Err(e),
 
         Ok(object) => {
             let obj_info = object.info()?;
 
             if obj_info.data_size() > p1.buffer().len() {
                 p1.set_updated_size(obj_info.data_size());
-                return Err(Error::new(ErrorKind::ShortBuffer));
+                return Err(ErrorKind::ShortBuffer.into());
             }
-            let read_bytes = object.read(&mut data_buffer).unwrap();
+            let read_bytes = object.read(&mut data_buffer)?;
             if read_bytes != obj_info.data_size() as u32 {
-                return Err(Error::new(ErrorKind::ExcessData));
+                return Err(ErrorKind::ExcessData.into());
             }
 
             p1.set_updated_size(read_bytes as usize);

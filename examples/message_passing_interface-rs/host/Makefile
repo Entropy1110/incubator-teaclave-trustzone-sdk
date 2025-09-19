@@ -24,14 +24,13 @@ LINKER_CFG := target.$(TARGET).linker=\"$(CROSS_COMPILE)gcc\"
 
 OUT_DIR := $(CURDIR)/target/$(TARGET)/release
 
-ifeq ($(STD),)
-all:
-	@echo "Please \`export STD=y\` then rerun \`source environment\` to build the STD version"
-else
-all: host strip
-endif
+all: clippy host strip
 
-host:
+clippy:
+	@cargo fmt
+	@cargo clippy --target $(TARGET_HOST) -- -D warnings -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic
+
+host: clippy
 	@cargo build --target $(TARGET_HOST) --release --config $(LINKER_CFG)
 
 strip: host
