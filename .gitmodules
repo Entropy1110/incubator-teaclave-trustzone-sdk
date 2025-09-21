@@ -4,6 +4,6 @@
 [submodule "examples/secure_update-rs"]
 	path = examples/secure_update-rs
 	url = https://github.com/Entropy1110/secure_update-rs.git
-[submodule "examples/examples/key_manager-rs"]
-	path = examples/examples/key_manager-rs
+[submodule "examples/key_manager-rs"]
+	path = examples/key_manager-rs
 	url = https://github.com/Entropy1110/key_manager-rs.git
