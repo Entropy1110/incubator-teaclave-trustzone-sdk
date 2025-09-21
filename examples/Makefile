@@ -49,7 +49,8 @@ COMMON_EXAMPLES = \
 	time-rs \
 	udp_socket-rs \
 	signature_verification-rs \
-	client_pool-rs
+	client_pool-rs \
+	key_manager-rs
 
 # Clean targets
 STD_ONLY_EXAMPLES_CLEAN = $(STD_ONLY_EXAMPLES:%=%-clean)
